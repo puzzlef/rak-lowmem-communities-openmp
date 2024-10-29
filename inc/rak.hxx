@@ -1,19 +1,13 @@
 #pragma once
 #include <utility>
-#include <tuple>
 #include <vector>
 #include <cstdint>
 #include "_main.hxx"
-#ifdef OPENMP
 #include <omp.h>
-#endif
 
-using std::pair;
-using std::tuple;
 using std::vector;
 using std::make_pair;
 using std::move;
-using std::get;
 
 
 
@@ -69,10 +63,6 @@ struct RakResult {
   float markingTime;
   /** Time spent in milliseconds for initializing community memberships. */
   float initializationTime;
-  /** Time spent in milliseconds for splitting disconnected communities. */
-  float splittingTime;
-  /** Number of vertices initially marked as affected. */
-  size_t affectedVertices;
   #pragma endregion
 
 
@@ -84,11 +74,9 @@ struct RakResult {
    * @param time time spent in milliseconds
    * @param markingTime time spent in milliseconds for initial marking of affected vertices
    * @param initializationTime time spent in initializing community memberships
-   * @param splittingTime time spent in splitting disconnected communities
-   * @param affectedVertices number of vertices initially marked as affected
    */
-  RakResult(vector<K>&& membership, int iterations=0, float time=0, float markingTime=0, float initializationTime=0, float splittingTime=0, size_t affectedVertices=0) :
-  membership(membership), iterations(iterations), time(time), markingTime(markingTime), initializationTime(initializationTime), splittingTime(splittingTime), affectedVertices(affectedVertices) {}
+  RakResult(vector<K>&& membership, int iterations=0, float time=0, float markingTime=0, float initializationTime=0) :
+  membership(membership), iterations(iterations), time(time), markingTime(markingTime), initializationTime(initializationTime) {}
 
 
   /**
@@ -98,11 +86,9 @@ struct RakResult {
    * @param time time spent in milliseconds
    * @param markingTime time spent in milliseconds for initial marking of affected vertices
    * @param initializationTime time spent in initializing community memberships
-   * @param splittingTime time spent in splitting disconnected communities
-   * @param affectedVertices number of vertices initially marked as affected
    */
-  RakResult(vector<K>& membership, int iterations=0, float time=0, float markingTime=0, float initializationTime=0, float splittingTime=0, size_t affectedVertices=0) :
-  membership(move(membership)), iterations(iterations), time(time), markingTime(markingTime), initializationTime(initializationTime), splittingTime(splittingTime), affectedVertices(affectedVertices) {}
+  RakResult(vector<K>& membership, int iterations=0, float time=0, float markingTime=0, float initializationTime=0) :
+  membership(move(membership)), iterations(iterations), time(time), markingTime(markingTime), initializationTime(initializationTime) {}
   #pragma endregion
 };
 #pragma endregion
@@ -153,18 +139,6 @@ inline void rakFreeHashtablesW(vector<vector<K>*>& vcs, vector<vector<W>*>& vcou
  * @param x original graph
  */
 template <class G, class K>
-inline void rakInitializeW(vector<K>& vcom, const G& x) {
-  x.forEachVertexKey([&](auto u) { vcom[u] = u; });
-}
-
-
-#ifdef OPENMP
-/**
- * Initialize communities such that each vertex is its own community.
- * @param vcom community each vertex belongs to (updated, must be initialized)
- * @param x original graph
- */
-template <class G, class K>
 inline void rakInitializeOmpW(vector<K>& vcom, const G& x) {
   size_t S = x.span();
   #pragma omp parallel for schedule(auto)
@@ -173,38 +147,6 @@ inline void rakInitializeOmpW(vector<K>& vcom, const G& x) {
     vcom[u] = u;
   }
 }
-#endif
-
-
-/**
- * Initialize communities from given initial communities.
- * @param vcom community each vertex belongs to (updated, must be initialized)
- * @param x original graph
- * @param q initial community each vertex belongs to
- */
-template <class G, class K>
-inline void rakInitializeFromW(vector<K>& vcom, const G& x, const vector<K>& q) {
-  x.forEachVertexKey([&](auto u) { vcom[u] = q[u]; });
-}
-
-
-#ifdef OPENMP
-/**
- * Initialize communities from given initial communities.
- * @param vcom community each vertex belongs to (updated, must be initialized)
- * @param x original graph
- * @param q initial community each vertex belongs to
- */
-template <class G, class K>
-inline void rakInitializeFromOmpW(vector<K>& vcom, const G& x, const vector<K>& q) {
-  size_t S = x.span();
-  #pragma omp parallel for schedule(auto)
-  for (K u=0; u<S; ++u) {
-    if (!x.hasVertex(u)) continue;
-    vcom[u] = q[u];
-  }
-}
-#endif
 #pragma endregion
 
 
@@ -266,7 +208,7 @@ inline void rakClearScanW(vector<K>& vcs, vector<W>& vcout) {
  * @returns [best community, best edge weight to community]
  */
 template <class G, class K, class W>
-inline pair<K, W> rakChooseCommunity(const G& x, K u, const vector<K>& vcom, const vector<K>& vcs, const vector<W>& vcout) {
+inline auto rakChooseCommunity(const G& x, K u, const vector<K>& vcom, const vector<K>& vcs, const vector<W>& vcout) {
   K d = vcom[u];
   K cmax = K();
   W wmax = W();
@@ -280,33 +222,6 @@ inline pair<K, W> rakChooseCommunity(const G& x, K u, const vector<K>& vcom, con
 
 
 #pragma region MOVE ITERATION
-/**
- * Move each vertex to its best community.
- * @param vcom community each vertex belongs to (updated)
- * @param vaff is vertex affected (updated)
- * @param vcs communities vertex u is linked to (temporary buffer, updated)
- * @param vcout total edge weight from vertex u to community C (temporary buffer, updated)
- * @param x original graph
- * @param fa is vertex allowed to be updated? (u)
- * @returns number of changed vertices
- */
-template <class G, class K, class W, class F, class FA>
-inline size_t rakMoveIterationW(vector<K>& vcom, vector<F>& vaff, vector<K>& vcs, vector<W>& vcout, const G& x, FA fa) {
-  size_t a = 0;
-  x.forEachVertexKey([&](auto u) {
-    if (!fa(u) || !vaff[u]) return;
-    K d = vcom[u];
-    rakClearScanW(vcs, vcout);
-    rakScanCommunitiesW(vcs, vcout, x, u, vcom);
-    auto [c, w] = rakChooseCommunity(x, u, vcom, vcs, vcout);
-    if (c && c!=d) { vcom[u] = c; ++a; x.forEachEdgeKey(u, [&](auto v) { vaff[v] = F(1); }); }
-    vaff[u] = F(0);
-  });
-  return a;
-}
-
-
-#ifdef OPENMP
 /**
  * Move each vertex to its best community.
  * @param vcom community each vertex belongs to (updated)
@@ -335,7 +250,6 @@ inline size_t rakMoveIterationOmpW(vector<K>& vcom, vector<F>& vaff, vector<vect
   }
   return a;
 }
-#endif
 #pragma endregion
 
 
@@ -351,55 +265,11 @@ inline size_t rakMoveIterationOmpW(vector<K>& vcom, vector<F>& vaff, vector<vect
  * @param fa is vertex allowed to be updated? (u)
  * @returns rak result
  */
-template <bool DYNAMIC=false, class FLAG=char, class G, class FI, class FM, class FA>
-inline auto rakInvoke(const G& x, const RakOptions& o, FI fi, FM fm, FA fa) {
-  using K = typename G::key_type;
-  using V = typename G::edge_value_type;
-  using W = RAK_WEIGHT_TYPE;
-  using F = FLAG;
-  int l = 0;
-  // Get graph properties.
-  size_t S = x.span();
-  size_t N = x.order();
-  // Allocate buffers.
-  vector<F> vaff(S);   // Affected vertex flag
-  vector<K> vcom;      // Community membership
-  vector<K> vcs;       // Hashtable keys
-  vector<W> vcout(S);  // Hashtable values
-  if (!DYNAMIC) vcom.resize(S);
-  // Perform RAK algorithm.
-  float tm = 0, ti = 0;  // Time spent in different phases
-  float t  = measureDuration([&]() {
-    // Initialize community membership.
-    ti += measureDuration([&]() { fi(vcom); });
-    // Mark affected vertices.
-    tm += measureDuration([&]() { fm(vaff, vcs, vcout, vcom); });
-    // Perform iterations.
-    for (l=0; l<o.maxIterations;) {
-      size_t n = rakMoveIterationW(vcom, vaff, vcs, vcout, x, fa); ++l;
-      if (double(n)/N <= o.tolerance) break;
-    }
-  }, o.repeat);
-  return RakResult<K>(vcom, l, t, tm/o.repeat, ti/o.repeat, 0, countValue(vaff, F(1)));
-}
-
-
-#ifdef OPENMP
-/**
- * Setup and perform the RAK algorithm.
- * @param x original graph
- * @param o rak options
- * @param fi initialzing community membership (vcom)
- * @param fm marking affected vertices (vaff, vcs, vcout, vcom)
- * @param fa is vertex allowed to be updated? (u)
- * @returns rak result
- */
-template <bool DYNAMIC=false, class FLAG=char, class G, class FI, class FM, class FA>
+template <class G, class FI, class FM, class FA>
 inline auto rakInvokeOmp(const G& x, const RakOptions& o, FI fi, FM fm, FA fa) {
   using K = typename G::key_type;
-  using V = typename G::edge_value_type;
   using W = RAK_WEIGHT_TYPE;
-  using F = FLAG;
+  using F = char;
   int l = 0;
   int T = omp_get_max_threads();
   // Get graph properties.
@@ -407,10 +277,9 @@ inline auto rakInvokeOmp(const G& x, const RakOptions& o, FI fi, FM fm, FA fa) {
   size_t N = x.order();
   // Allocate buffers.
   vector<F> vaff(S);  // Affected vertex flag
-  vector<K> vcom;     // Community membership
+  vector<K> vcom(S);  // Community membership
   vector<vector<K>*> vcs(T);    // Hashtable keys
   vector<vector<W>*> vcout(T);  // Hashtable values
-  if (!DYNAMIC) vcom.resize(S);
   rakAllocateHashtablesW(vcs, vcout, S);
   // Perform RAK algorithm.
   float tm = 0, ti = 0;  // Time spent in different phases
@@ -426,26 +295,7 @@ inline auto rakInvokeOmp(const G& x, const RakOptions& o, FI fi, FM fm, FA fa) {
     }
   }, o.repeat);
   rakFreeHashtablesW(vcs, vcout);
-  return RakResult<K>(vcom, l, t, tm/o.repeat, ti/o.repeat, 0, countValueOmp(vaff, F(1)));
-}
-#endif
-#pragma endregion
-
-
-
-
-#pragma region REPEAT SETUP (DYNAMIC)
-/**
- * Setup the Dynamic RAK algorithm for multiple runs.
- * @param qs initial community membership for each run (updated)
- * @param q initial community membership
- * @param repeat number of runs
- */
-template <class K>
-inline void rakSetupInitialsW(vector2d<K>& qs, const vector<K>& q, int repeat) {
-  qs.resize(repeat);
-  for (int r=0; r<repeat; ++r)
-    qs[r] = q;
+  return RakResult<K>(vcom, l, t, tm/o.repeat, ti/o.repeat);
 }
 #pragma endregion
 
@@ -459,29 +309,13 @@ inline void rakSetupInitialsW(vector2d<K>& qs, const vector<K>& q, int repeat) {
  * @param o rak options
  * @returns rak result
  */
-template <class FLAG=char, class G>
-inline auto rakStatic(const G& x, const RakOptions& o={}) {
-  auto fi = [&](auto& vcom) { rakInitializeW(vcom, x); };
-  auto fm = [ ](auto& vaff, auto& vcs, auto& vcout, const auto& vcom) { fillValueU(vaff, FLAG(1)); };
-  auto fa = [ ](auto u) { return true; };
-  return rakInvoke<false, FLAG>(x, o, fi, fm, fa);
-}
-
-
-#ifdef OPENMP
-/**
- * Obtain the community membership of each vertex with Static RAK.
- * @param x original graph
- * @param o rak options
- * @returns rak result
- */
-template <class FLAG=char, class G>
+template <class G>
 inline auto rakStaticOmp(const G& x, const RakOptions& o={}) {
+  using FLAG = char;
   auto fi = [&](auto& vcom) { rakInitializeOmpW(vcom, x); };
   auto fm = [ ](auto& vaff, auto& vcs, auto& vcout, const auto& vcom) { fillValueOmpU(vaff, FLAG(1)); };
   auto fa = [ ](auto u) { return true; };
-  return rakInvokeOmp<false, FLAG>(x, o, fi, fm, fa);
+  return rakInvokeOmp(x, o, fi, fm, fa);
 }
-#endif
 #pragma endregion
 #pragma endregion

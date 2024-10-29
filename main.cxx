@@ -58,36 +58,21 @@ inline double getModularity(const G& x, const RakResult<K>& a, double M) {
  */
 template <class G>
 void runExperiment(const G& x) {
-  using K = typename G::key_type;
-  using V = typename G::edge_value_type;
-  int repeat  = REPEAT_METHOD;
-  int retries = 5;
-  vector<K> *init = nullptr;
-  double M = edgeWeightOmp(x)/2;
+  int repeat = REPEAT_METHOD;
+  double   M = edgeWeightOmp(x)/2;
   // Follow a specific result logging format, which can be easily parsed later.
-  auto flog = [&](const auto& ans, const char *technique) {
+  auto flog = [&](const auto& ans, const char *technique, size_t numSlots=0) {
     printf(
       "{%03d threads} -> "
-      "{%09.1fms, %09.1fms mark, %09.1fms init, %09.1fms split, %.3e aff, %04d iters, %01.9f modularity, %zu/%zu disconnected} %s\n",
+      "{%09.1fms, %09.1fms mark, %09.1fms init, %.3e slots, %04d iters, %01.9f modularity} %s\n",
       MAX_THREADS,
-      ans.time, ans.markingTime, ans.initializationTime, ans.splittingTime,
-      double(ans.affectedVertices),
-      ans.iterations, getModularity(x, ans, M),
-      countValue(communitiesDisconnectedOmp(x, ans.membership), char(1)),
-      communities(x, ans.membership).size(), technique
+      ans.time, ans.markingTime, ans.initializationTime, double(numSlots),
+      ans.iterations, getModularity(x, ans, M), technique
     );
   };
   // Find static RAK.
   auto b0 = rakStaticOmp(x, {repeat});
   flog(b0, "rakStaticOmp");
-  {
-    auto b1 = rakSplitLastStaticOmp<1>(x, {repeat});
-    flog(b1, "rakSplitLastStaticOmp1");
-    auto b2 = rakSplitLastStaticOmp<2>(x, {repeat});
-    flog(b2, "rakSplitLastStaticOmp2");
-    auto b4 = rakSplitLastStaticOmp<4>(x, {repeat});
-    flog(b4, "rakSplitLastStaticOmp4");
-  }
 }
 
 
@@ -109,7 +94,7 @@ int main(int argc, char **argv) {
   LOG("Loading graph %s ...\n", file);
   DiGraph<K, None, V> x;
   readMtxOmpW(x, file, weighted); LOG(""); println(x);
-  if (!symmetric) { x = symmetricizeOmp(x); LOG(""); print(x); printf(" (symmetricize)\n"); }
+  if (!symmetric) { symmetrizeOmpU(x); LOG(""); print(x); printf(" (symmetrize)\n"); }
   runExperiment(x);
   printf("\n");
   return 0;
