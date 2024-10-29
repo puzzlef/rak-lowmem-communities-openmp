@@ -15,3 +15,4 @@
 #include "dfs.hxx"
 #include "batch.hxx"
 #include "rak.hxx"
+#include "rakLowmem.hxx"

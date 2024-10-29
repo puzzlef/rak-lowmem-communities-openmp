@@ -71,8 +71,71 @@ void runExperiment(const G& x) {
     );
   };
   // Find static RAK.
-  auto b0 = rakStaticOmp(x, {repeat});
-  flog(b0, "rakStaticOmp");
+  {
+    auto b0 = rakStaticOmp(x, {repeat});
+    flog(b0, "rakStaticOmp");
+  }
+  // Get community memberships on original graph (low memory).
+  {
+    auto b1 = rakLowmemStaticOmp<false>(x, repeat);
+    flog(b1, "rakLowmemStaticOmpMajority", 0);
+  }
+  {
+    auto b1 = rakLowmemStaticOmp<true, false, 4>(x, repeat);
+    flog(b1, "rakLowmemStaticOmpMajorities", 4);
+  }
+  {
+    auto b1 = rakLowmemStaticOmp<true, false, 8>(x, repeat);
+    flog(b1, "rakLowmemStaticOmpMajorities", 8);
+  }
+  {
+    auto b1 = rakLowmemStaticOmp<true, false, 16>(x, repeat);
+    flog(b1, "rakLowmemStaticOmpMajorities", 16);
+  }
+  {
+    auto b1 = rakLowmemStaticOmp<true, false, 32>(x, repeat);
+    flog(b1, "rakLowmemStaticOmpMajorities", 32);
+  }
+  {
+    auto b1 = rakLowmemStaticOmp<true, false, 64>(x, repeat);
+    flog(b1, "rakLowmemStaticOmpMajorities", 64);
+  }
+  {
+    auto b1 = rakLowmemStaticOmp<true, false, 128>(x, repeat);
+    flog(b1, "rakLowmemStaticOmpMajorities", 128);
+  }
+  {
+    auto b1 = rakLowmemStaticOmp<true, false, 256>(x, repeat);
+    flog(b1, "rakLowmemStaticOmpMajorities", 256);
+  }
+  {
+    auto b2 = rakLowmemStaticOmp<true, true, 4>(x, repeat);
+    flog(b2, "rakLowmemStaticOmpMajoritiesRescan", 4);
+  }
+  {
+    auto b2 = rakLowmemStaticOmp<true, true, 8>(x, repeat);
+    flog(b2, "rakLowmemStaticOmpMajoritiesRescan", 8);
+  }
+  {
+    auto b2 = rakLowmemStaticOmp<true, true, 16>(x, repeat);
+    flog(b2, "rakLowmemStaticOmpMajoritiesRescan", 16);
+  }
+  {
+    auto b2 = rakLowmemStaticOmp<true, true, 32>(x, repeat);
+    flog(b2, "rakLowmemStaticOmpMajoritiesRescan", 32);
+  }
+  {
+    auto b2 = rakLowmemStaticOmp<true, true, 64>(x, repeat);
+    flog(b2, "rakLowmemStaticOmpMajoritiesRescan", 64);
+  }
+  {
+    auto b2 = rakLowmemStaticOmp<true, true, 128>(x, repeat);
+    flog(b2, "rakLowmemStaticOmpMajoritiesRescan", 128);
+  }
+  {
+    auto b2 = rakLowmemStaticOmp<true, true, 256>(x, repeat);
+    flog(b2, "rakLowmemStaticOmpMajoritiesRescan", 256);
+  }
 }
 
 
