@@ -144,13 +144,12 @@ inline void rakLowmemClearScanW(array<V, SLOTS>& mws) {
  * @param mws total edge weight from vertex u to community C (updated)
  * @param x original graph
  * @param u given vertex
- * @param d previous community of vertex u
  * @param mcs majority communities vertex u is linked to
  * @param vcom community each vertex belongs to
  * @returns [best community, delta modularity]
  */
 template <bool SELF=false, bool RESCAN=false, class G, class K, class V, size_t SLOTS>
-inline auto rakLowmemChooseCommunityW(array<V, SLOTS>& mws, const G& x, K u, K d, const array<K, SLOTS>& mcs, const vector<K>& vcom) {
+inline auto rakLowmemChooseCommunityW(array<V, SLOTS>& mws, const G& x, K u, const array<K, SLOTS>& mcs, const vector<K>& vcom) {
   // Compute total edge weight to communities.
   if (RESCAN) {
     rakLowmemClearScanW(mws);
@@ -167,8 +166,6 @@ inline auto rakLowmemChooseCommunityW(array<V, SLOTS>& mws, const G& x, K u, K d
   for (int i=0; i<SLOTS; ++i) {
     K c = mcs[i];
     V w = mws[i];
-    if (!w) continue;
-    if (!SELF && c==d) continue;
     if (w>wmax) { wmax = w; cmax = c; }
   }
   return make_pair(cmax, wmax);
@@ -202,12 +199,12 @@ inline size_t rakLowmemMoveIterationOmpW(vector<K>& vcom, vector<F>& vaff, vecto
     if (MULTI) {
       rakLowmemClearScanW(*mws[t]);
       rakLowmemScanCommunitiesW(*mcs[t], *mws[t], x, u, vcom);
-      auto [c, w] = rakLowmemChooseCommunityW<false, RESCAN>(*mws[t], x, u, d, *mcs[t], vcom);
-      if (c && c!=d) { vcom[u] = c; ++a; x.forEachEdgeKey(u, [&](auto v) { vaff[v] = F(1); }); }
+      auto [c, w] = rakLowmemChooseCommunityW<false, RESCAN>(*mws[t], x, u, *mcs[t], vcom);
+      if (w>0 && c!=d) { vcom[u] = c; ++a; x.forEachEdgeKey(u, [&](auto v) { vaff[v] = F(1); }); }
     }
     else {
       auto [c, w] = rakLowmemScanCommunitiesMajority(x, u, vcom);
-      if (c && c!=d) { vcom[u] = c; ++a; x.forEachEdgeKey(u, [&](auto v) { vaff[v] = F(1); }); }
+      if (w>0 && c!=d) { vcom[u] = c; ++a; x.forEachEdgeKey(u, [&](auto v) { vaff[v] = F(1); }); }
     }
     vaff[u] = F();
   }
