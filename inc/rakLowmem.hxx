@@ -148,7 +148,7 @@ inline void rakLowmemClearScanW(array<V, SLOTS>& mws) {
  * @param vcom community each vertex belongs to
  * @returns [best community, delta modularity]
  */
-template <bool SELF=false, bool RESCAN=false, class G, class K, class V, size_t SLOTS>
+template <bool SELF=false, bool RESCAN=true, class G, class K, class V, size_t SLOTS>
 inline auto rakLowmemChooseCommunityW(array<V, SLOTS>& mws, const G& x, K u, const array<K, SLOTS>& mcs, const vector<K>& vcom) {
   // Compute total edge weight to communities.
   if (RESCAN) {
@@ -186,7 +186,7 @@ inline auto rakLowmemChooseCommunityW(array<V, SLOTS>& mws, const G& x, K u, con
  * @param fa is vertex allowed to be updated? (u)
  * @returns number of changed vertices
  */
-template <bool MULTI=false, bool RESCAN=false, class G, class K, class V, class F, size_t SLOTS, class FA>
+template <bool MULTI=true, bool RESCAN=true, class G, class K, class V, class F, size_t SLOTS, class FA>
 inline size_t rakLowmemMoveIterationOmpW(vector<K>& vcom, vector<F>& vaff, vector<array<K, SLOTS>*>& mcs, vector<array<V, SLOTS>*>& mws, const G& x, FA fa) {
   size_t a = K();
   size_t S = x.span();
@@ -225,7 +225,7 @@ inline size_t rakLowmemMoveIterationOmpW(vector<K>& vcom, vector<F>& vaff, vecto
  * @param fa is vertex allowed to be updated? (u)
  * @returns rak result
  */
-template <bool MULTI=false, bool RESCAN=false, size_t SLOTS=4, class G, class FI, class FM, class FA>
+template <bool MULTI=true, bool RESCAN=true, size_t SLOTS=8, class G, class FI, class FM, class FA>
 inline auto rakLowmemInvokeOmp(const G& x, const RakOptions& o, FI fi, FM fm, FA fa) {
   using K = typename G::key_type;
   using V = typename G::edge_value_type;
@@ -270,7 +270,7 @@ inline auto rakLowmemInvokeOmp(const G& x, const RakOptions& o, FI fi, FM fm, FA
  * @param o rak options
  * @returns rak result
  */
-template <bool MULTI=false, bool RESCAN=false, size_t SLOTS=4, class G>
+template <bool MULTI=true, bool RESCAN=true, size_t SLOTS=8, class G>
 inline auto rakLowmemStaticOmp(const G& x, const RakOptions& o={}) {
   using FLAG = char;
   auto fi = [&](auto& vcom) { rakInitializeOmpW(vcom, x); };
