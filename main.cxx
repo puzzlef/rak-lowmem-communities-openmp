@@ -64,9 +64,9 @@ void runExperiment(const G& x) {
   auto flog = [&](const auto& ans, const char *technique, size_t numSlots=0) {
     printf(
       "{%03d threads} -> "
-      "{%09.1fms, %09.1fms mark, %09.1fms init, %.3e slots, %04d iters, %01.9f modularity} %s\n",
+      "{%09.1fms, %09.1fms mark, %09.1fms init, %09.4fGB memory, %.3e slots, %04d iters, %01.9f modularity} %s\n",
       MAX_THREADS,
-      ans.time, ans.markingTime, ans.initializationTime, double(numSlots),
+      ans.time, ans.markingTime, ans.initializationTime, ans.memory, double(numSlots),
       ans.iterations, getModularity(x, ans, M), technique
     );
   };
@@ -79,6 +79,10 @@ void runExperiment(const G& x) {
   {
     auto b2 = rakLowmemStaticOmp(x, {repeat});
     flog(b2, "rakLowmemStaticOmpMajoritiesRescan", 8);
+  }
+  {
+    auto b1 = rakLowmemStaticOmp<false, true, 1>(x, {repeat});
+    flog(b1, "rakLowmemStaticOmpMajorityRescan", 1);
   }
 }
 
